@@ -10,7 +10,7 @@ const app = new Hono<{ Bindings: Bindings }>()
 // Allow frontend to communicate with this backend
 app.use('/*', cors({
   origin: '*', // In production, replace with your actual frontend URL
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
 }))
 
