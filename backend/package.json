@@ -1,0 +1,20 @@
+{
+  "name": "swapna-aakar-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create swapna-aakar-db",
+    "db:init": "wrangler d1 execute swapna-aakar-db --local --file=./schema.sql",
+    "db:init:remote": "wrangler d1 execute swapna-aakar-db --remote --file=./schema.sql"
+  },
+  "dependencies": {
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240222.0",
+    "typescript": "^5.0.0",
+    "wrangler": "^4.85.0"
+  }
+}

@@ -1,0 +1,9 @@
+name = "swapna-aakar-backend"
+main = "src/index.ts"
+compatibility_date = "2024-02-22"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "swapna-aakar-db"
+database_id = "6ee522ee-a983-4f00-94c4-910a31e93bb1"
