@@ -1,0 +1,13 @@
+# Wrangler local dev secrets - DO NOT commit
+.dev.vars
+
+# Wrangler build & temp artifacts
+.wrangler/
+
+# Node modules
+node_modules/
+
+# Local env files
+.env
+.env.*
+!.env.example

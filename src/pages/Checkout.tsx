@@ -53,16 +53,52 @@ export default function Checkout() {
     setStep(2); // Move to payment
   };
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
+    if (!user) return;
     setIsProcessing(true);
-    setTimeout(() => {
+    
+    try {
+      const orderData = {
+        name: user.name || "Customer",
+        email: user.email,
+        phone: addressForm.phone,
+        address: `${addressForm.address}, ${addressForm.city}, ${addressForm.state} - ${addressForm.pincode}`,
+        items: items.map(item => ({
+          name: item.name,
+          quantity: item.qty,
+          price: item.price,
+          image: item.images?.[0]
+        })),
+        total: subtotal,
+        paymentStatus: "Successful"
+      };
+
+      const response = await fetch(`${import.meta.env.VITE_ADMIN_API_BASE ?? "http://localhost:8787"}/api/checkout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(orderData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to process checkout");
+      }
+
+      const data = await response.json();
+      console.log("Order processed:", data);
+
       const ids = items.map((i) => i.id);
       markPurchased(ids);
       clear();
-      setIsProcessing(false);
-      toast.success("Order placed successfully!");
+      toast.success("Order placed successfully! Check your email for confirmation.");
       navigate("/dashboard?tab=orders");
-    }, 1500);
+    } catch (error) {
+      console.error("Checkout error:", error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
