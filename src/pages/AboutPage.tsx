@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Printer3d, Sparkles, Heart, MapPin, ArrowLeft } from "lucide-react";
+import { Box, Sparkles, Heart, MapPin, ArrowLeft } from "lucide-react";
 
 // Use a simple emoji/lucide approach – no external images needed
 const MILESTONES = [
@@ -73,7 +73,7 @@ export default function AboutPage() {
 
         {/* CTA */}
         <div className="p-8 rounded-2xl bg-gradient-card border border-border text-center">
-          <Printer3d className="w-10 h-10 text-primary mx-auto mb-4" />
+          <Box className="w-10 h-10 text-primary mx-auto mb-4" />
           <h3 className="font-display text-2xl font-bold mb-2">Have a custom idea?</h3>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
             We love bringing unique ideas to life. Reach out and let's create something amazing together.
