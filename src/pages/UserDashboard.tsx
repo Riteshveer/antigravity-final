@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useUserAuth, type Address } from "@/context/UserAuthContext";
 import { Navigate, useSearchParams, useNavigate } from "react-router-dom";
+import { adminApi } from "@/lib/adminApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,7 @@ export default function UserDashboard() {
   const [orders, setOrders] = useState<any[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
 
+  // Pre-fill address form from user's stored address
   useEffect(() => {
     if (user?.address) {
       setAddressForm(user.address);
@@ -30,15 +32,12 @@ export default function UserDashboard() {
   }, [user]);
 
   useEffect(() => {
-    if (user) {
+    if (user?.email) {
       setOrdersLoading(true);
-      setTimeout(() => {
-        setOrders([
-          { id: "ORD-98213", date: "2023-11-20", total: 1299, status: "Delivered", items: 1 },
-          { id: "ORD-99042", date: "2023-12-05", total: 899, status: "Shipped", items: 1 },
-        ]);
-        setOrdersLoading(false);
-      }, 1000);
+      adminApi.getUserOrders(user.email)
+        .then(setOrders)
+        .catch(() => toast.error("Failed to load orders"))
+        .finally(() => setOrdersLoading(false));
     }
   }, [user]);
 
@@ -57,6 +56,15 @@ export default function UserDashboard() {
     
     saveAddress(addressForm);
     toast.success("Address saved locally to your device!");
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Delivered": return "bg-green-500/10 text-green-500";
+      case "Cancelled": return "bg-red-500/10 text-red-500";
+      case "Shipped": return "bg-purple-500/10 text-purple-500";
+      default: return "bg-blue-500/10 text-blue-500";
+    }
   };
 
   return (
@@ -99,14 +107,19 @@ export default function UserDashboard() {
                     {orders.map((order) => (
                       <div key={order.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border rounded-lg">
                         <div>
-                          <p className="font-semibold">{order.id}</p>
-                          <p className="text-sm text-muted-foreground">Placed on {order.date} • {order.items} item(s)</p>
+                          <p className="font-semibold font-mono text-sm">{order.id}</p>
+                          <p className="text-sm text-muted-foreground">Placed on {new Date(order.created_at).toLocaleDateString()}</p>
                         </div>
-                        <div className="mt-4 sm:mt-0 text-left sm:text-right">
-                          <p className="font-bold">₹{order.total}</p>
-                          <span className={`text-xs px-2 py-1 rounded-full ${order.status === 'Delivered' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500'}`}>
-                            {order.status}
-                          </span>
+                        <div className="mt-4 sm:mt-0 flex items-center gap-4">
+                          <div className="text-left sm:text-right">
+                            <p className="font-bold">₹{order.total_amount.toLocaleString('en-IN')}</p>
+                            <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(order.status)}`}>
+                              {order.status}
+                            </span>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/track/${order.id}`)}>
+                            Track Order
+                          </Button>
                         </div>
                       </div>
                     ))}

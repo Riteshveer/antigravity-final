@@ -2,13 +2,14 @@ import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useUserAuth } from "@/context/UserAuthContext";
 import { ADMIN_EMAILS } from "@/lib/adminApi";
 import { NavLink } from "@/components/NavLink";
-import { LayoutDashboard, Package, Boxes, BarChart3, LogOut, ShieldCheck, ArrowLeft } from "lucide-react";
+import { LayoutDashboard, Package, Boxes, BarChart3, LogOut, ShieldCheck, ArrowLeft, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 const items = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/products", label: "Products", icon: Package },
+  { to: "/admin/orders", label: "Orders", icon: ShoppingBag },
   { to: "/admin/stock", label: "Stock", icon: Boxes },
   { to: "/admin/analytics", label: "Analytics", icon: BarChart3 },
 ];

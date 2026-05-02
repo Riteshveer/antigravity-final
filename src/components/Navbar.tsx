@@ -9,18 +9,18 @@ import { LoginModal } from "./LoginModal";
 import { useUserAuth } from "@/context/UserAuthContext";
 import { UserDropdown } from "./UserDropdown";
 
-const NAV: { label: string; category?: Category; target?: string }[] = [
+const NAV: { label: string; category?: Category; target?: string; route?: string }[] = [
   { label: "3D Figures", category: "3D Figures" },
   { label: "Anime", category: "Anime" },
   { label: "Lamps", category: "Lamps" },
   { label: "Posters", category: "Posters" },
-  { label: "Reviews", target: "reviews" },
+  { label: "Reviews", route: "/reviews" },
 ];
 
 export const Navbar = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const { count, openCart } = useCart();
-  const { setFilter, openSearch } = useStorefront();
+  const { filter, setFilter, openSearch } = useStorefront();
   const { user } = useUserAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -28,7 +28,9 @@ export const Navbar = () => {
   const isProductsPage = location.pathname === "/products";
 
   const handleNav = (item: (typeof NAV)[number]) => {
-    if (item.category) {
+    if (item.route) {
+      navigate(item.route);
+    } else if (item.category) {
       setFilter(item.category);
       if (!isHomepage && !isProductsPage) {
         navigate("/products");
@@ -57,23 +59,31 @@ export const Navbar = () => {
         </Link>
 
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
-          {NAV.map((item) => (
-            <button
-              key={item.label}
-              onClick={() => handleNav(item)}
-              className="text-muted-foreground hover:text-foreground transition-colors relative group"
-            >
-              {item.label}
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-foreground transition-all group-hover:w-full" />
-            </button>
-          ))}
+          {NAV.map((item) => {
+            const isActive = item.route 
+              ? location.pathname === item.route 
+              : item.category 
+                ? location.pathname === "/products" && filter === item.category
+                : false;
+
+            return (
+              <button
+                key={item.label}
+                onClick={() => handleNav(item)}
+                className={`${isActive ? "text-foreground" : "text-muted-foreground"} hover:text-foreground transition-colors relative group`}
+              >
+                {item.label}
+                <span className={`absolute -bottom-1 left-0 h-0.5 bg-foreground transition-all ${isActive ? "w-full" : "w-0 group-hover:w-full"}`} />
+              </button>
+            );
+          })}
           <Link 
             to="/products" 
             onClick={() => setFilter("All")}
-            className="text-muted-foreground hover:text-foreground transition-colors relative group"
+            className={`${location.pathname === "/products" && filter === "All" ? "text-foreground" : "text-muted-foreground"} hover:text-foreground transition-colors relative group`}
           >
             All Products
-            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-foreground transition-all group-hover:w-full" />
+            <span className={`absolute -bottom-1 left-0 h-0.5 bg-foreground transition-all ${location.pathname === "/products" && filter === "All" ? "w-full" : "w-0 group-hover:w-full"}`} />
           </Link>
         </nav>
 

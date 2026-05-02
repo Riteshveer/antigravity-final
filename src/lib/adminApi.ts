@@ -74,6 +74,29 @@ export type ActivityEvent = {
   message: string;
 };
 
+export type Order = {
+  id: string;
+  user_id: string;
+  user_email?: string;
+  total_amount: number;
+  status: string;
+  updated_at: string;
+  created_at: string;
+};
+
+export type TrackingTimelineItem = {
+  status: string;
+  description: string;
+  location: string;
+  time: string;
+};
+
+export type OrderTracking = {
+  orderId: string;
+  currentStatus: string;
+  timeline: TrackingTimelineItem[];
+};
+
 /* ---------- Allowed admin identities (UI-only gating) ---------- */
 export const ADMIN_EMAILS = ["riteshveer1177@gmail.com", "riteshveer0326@gmail.com"];
 export const ADMIN_PHONE = "+917498329578";
@@ -259,6 +282,58 @@ export const adminApi = {
       return mockActivity();
     }
     const r = await fetch(`${BASE}/admin/activity`, { headers: authHeaders() });
+    return r.json();
+  },
+
+  /* ---------------------- Orders & Tracking ---------------------- */
+
+  async listOrders(): Promise<Order[]> {
+    if (USE_MOCK) {
+      await sleep(150);
+      return [];
+    }
+    const r = await fetch(`${BASE}/admin/orders`, { headers: authHeaders() });
+    return r.json();
+  },
+
+  async updateOrderStatus(orderId: string, status: string, description: string, location: string): Promise<{ success: true }> {
+    if (USE_MOCK) {
+      await sleep(200);
+      return { success: true };
+    }
+    const r = await fetch(`${BASE}/api/admin/orders/${orderId}/status`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ status, description, location }),
+    });
+    if (!r.ok) throw new Error("Failed to update status");
+    return r.json();
+  },
+
+  async getTracking(orderId: string): Promise<OrderTracking> {
+    if (USE_MOCK) {
+      await sleep(200);
+      return {
+        orderId,
+        currentStatus: "Shipped",
+        timeline: [
+          { status: "Shipped", description: "In transit", location: "Mumbai Hub", time: new Date().toISOString() },
+          { status: "Placed", description: "Order placed", location: "Store", time: new Date(Date.now() - 86400000).toISOString() },
+        ]
+      };
+    }
+    const r = await fetch(`${BASE}/api/orders/${orderId}/tracking`);
+    if (!r.ok) throw new Error("Order not found or tracking unavailable");
+    return r.json();
+  },
+
+  async getUserOrders(email: string): Promise<Order[]> {
+    if (USE_MOCK) {
+      await sleep(150);
+      return [];
+    }
+    const r = await fetch(`${BASE}/api/orders/user/${email}`);
+    if (!r.ok) throw new Error("Failed to fetch user orders");
     return r.json();
   },
 };

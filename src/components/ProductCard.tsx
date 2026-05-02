@@ -12,10 +12,11 @@ const badgeStyles: Record<string, string> = {
 };
 
 export const ProductCard = ({ product }: { product: AdminProduct }) => {
-
   const { addItem, openCart, items, updateQty } = useCart();
   const off = Math.round(((product.mrp - product.price) / product.mrp) * 100);
   const inCart = items.find((i) => i.id === product.id)?.qty ?? 0;
+  const isOutOfStock = product.stock <= 0;
+  const isLowStock = !isOutOfStock && product.stock <= 5;
 
   const handleAdd = () => {
     addItem(product);
@@ -30,6 +31,10 @@ export const ProductCard = ({ product }: { product: AdminProduct }) => {
   };
 
   const handleIncrease = () => {
+    if (inCart >= product.stock) {
+      toast.error(`Only ${product.stock} left in stock`);
+      return;
+    }
     updateQty(product.id, inCart + 1);
   };
 
@@ -42,17 +47,44 @@ export const ProductCard = ({ product }: { product: AdminProduct }) => {
           loading="lazy"
           width={800}
           height={800}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+          className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${
+            isOutOfStock ? "opacity-50 grayscale" : ""
+          }`}
         />
-        {product.badge && (
-          <span className={`absolute top-3 left-3 px-2.5 py-1 text-[10px] font-display font-bold tracking-wider rounded-md ${badgeStyles[product.badge]}`}>
-            {product.badge}
+
+        {/* Out of Stock overlay */}
+        {isOutOfStock && (
+          <>
+            <div className="absolute inset-0 bg-background/40" />
+            <span className="absolute top-3 left-3 px-2.5 py-1 text-[10px] font-display font-bold tracking-wider rounded-md bg-destructive text-destructive-foreground">
+              OUT OF STOCK
+            </span>
+          </>
+        )}
+
+        {/* Normal badges when in stock */}
+        {!isOutOfStock && (
+          <>
+            {product.badge && (
+              <span className={`absolute top-3 left-3 px-2.5 py-1 text-[10px] font-display font-bold tracking-wider rounded-md ${badgeStyles[product.badge] ?? ""}`}>
+                {product.badge}
+              </span>
+            )}
+            <span className="absolute top-3 right-3 px-2 py-1 text-[10px] font-bold rounded-md bg-background/90 backdrop-blur border border-border">
+              -{off}%
+            </span>
+          </>
+        )}
+
+        {/* Low stock warning */}
+        {isLowStock && (
+          <span className="absolute bottom-3 left-3 px-2 py-1 text-[10px] font-bold rounded-md bg-accent text-accent-foreground">
+            Only {product.stock} left
           </span>
         )}
-        <span className="absolute top-3 right-3 px-2 py-1 text-[10px] font-bold rounded-md bg-background/90 backdrop-blur border border-border">
-          -{off}%
-        </span>
-        {inCart > 0 && (
+
+        {/* In-bag indicator */}
+        {inCart > 0 && !isOutOfStock && (
           <button
             onClick={openCart}
             aria-label={`${inCart} in bag — view bag`}
@@ -76,7 +108,13 @@ export const ProductCard = ({ product }: { product: AdminProduct }) => {
           <span className="font-display font-bold text-lg">₹{product.price.toLocaleString("en-IN")}</span>
           <span className="text-sm text-muted-foreground line-through">₹{product.mrp.toLocaleString("en-IN")}</span>
         </div>
-        {inCart === 0 ? (
+
+        {/* CTA — three states: out of stock / add / quantity stepper */}
+        {isOutOfStock ? (
+          <Button size="sm" disabled className="mt-2 w-full cursor-not-allowed opacity-70">
+            Out of Stock
+          </Button>
+        ) : inCart === 0 ? (
           <Button
             size="sm"
             onClick={handleAdd}
@@ -94,18 +132,20 @@ export const ProductCard = ({ product }: { product: AdminProduct }) => {
             >
               <Minus className="w-4 h-4" />
             </button>
-            <span className="font-display font-semibold text-sm tabular-nums">
-              {inCart} in bag
-            </span>
+            <span className="font-display font-semibold text-sm tabular-nums">{inCart} in bag</span>
             <button
               onClick={handleIncrease}
               aria-label="Increase quantity"
-              className="h-full px-3 hover:bg-primary-foreground/10 transition grid place-items-center"
+              disabled={inCart >= product.stock}
+              className={`h-full px-3 transition grid place-items-center ${
+                inCart >= product.stock ? "opacity-40 cursor-not-allowed" : "hover:bg-primary-foreground/10"
+              }`}
             >
               <Plus className="w-4 h-4" />
             </button>
           </div>
         )}
+
         <WriteReviewDialog product={product} />
       </div>
     </div>

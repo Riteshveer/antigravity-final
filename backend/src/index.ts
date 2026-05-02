@@ -80,8 +80,8 @@ app.post('/api/orders', async (c) => {
     
     // 1. Insert order
     statements.push(
-      c.env.DB.prepare('INSERT INTO orders (id, user_id, total_amount) VALUES (?, ?, ?)')
-        .bind(orderId, user_id, total_amount)
+      c.env.DB.prepare('INSERT INTO orders (id, user_id, total_amount, status) VALUES (?, ?, ?, ?)')
+        .bind(orderId, user_id, total_amount, 'Placed')
     )
     
     // 2. Insert items
@@ -91,6 +91,12 @@ app.post('/api/orders', async (c) => {
           .bind(crypto.randomUUID(), orderId, item.product_id, item.quantity, item.price)
       )
     }
+
+    // 3. Insert initial tracking entry
+    statements.push(
+      c.env.DB.prepare('INSERT INTO order_tracking (order_id, status, description, location) VALUES (?, ?, ?, ?)')
+        .bind(orderId, 'Placed', 'Order has been placed successfully.', 'Store')
+    )
     
     await c.env.DB.batch(statements)
     
@@ -226,6 +232,37 @@ app.post('/api/checkout', async (c) => {
     
     const orderWithId = { ...body, orderId }
 
+    // 1. Get user_id from email (or create user if doesn't exist)
+    const user = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first()
+    let userId = user?.id
+    
+    if (!userId) {
+      userId = crypto.randomUUID()
+      await c.env.DB.prepare('INSERT INTO users (id, email) VALUES (?, ?)').bind(userId, email).run()
+    }
+
+    // 2. Save order to database
+    const statements = []
+    
+    statements.push(
+      c.env.DB.prepare('INSERT INTO orders (id, user_id, total_amount, status) VALUES (?, ?, ?, ?)')
+        .bind(orderId, userId, total, 'Placed')
+    )
+    
+    for (const item of items) {
+      statements.push(
+        c.env.DB.prepare('INSERT INTO order_items (id, order_id, product_id, quantity, price) VALUES (?, ?, ?, ?, ?)')
+          .bind(crypto.randomUUID(), orderId, item.product_id || crypto.randomUUID(), item.quantity, item.price)
+      )
+    }
+
+    statements.push(
+      c.env.DB.prepare('INSERT INTO order_tracking (order_id, status, description, location) VALUES (?, ?, ?, ?)')
+        .bind(orderId, 'Placed', 'Order has been placed successfully.', 'Online Store')
+    )
+    
+    await c.env.DB.batch(statements)
+
     // Send emails in parallel using fetch-based helper
     const emailResults = await Promise.allSettled([
       // 1. Send to Customer
@@ -247,7 +284,7 @@ app.post('/api/checkout', async (c) => {
     // Log any email failures silently (don't block order response)
     emailResults.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.error(`Failed to send ${index === 0 ? 'customer' : 'admin'} email:`, result.reason?.message)
+        console.error(`Failed to send ${index === 0 ? 'customer' : 'admin'} email:`, (result as PromiseRejectedResult).reason?.message)
       }
     })
 
@@ -372,27 +409,165 @@ app.delete('/admin/products/:id', async (c) => {
   }
 })
 
-// Admin: Analytics Mock
-app.get('/admin/analytics', (c) => {
-  const days = Array.from({ length: 14 }).map((_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (13 - i));
-    return d.toISOString().slice(0, 10);
-  });
-  return c.json({
-    totals: { users: 15, orders: 42, revenue: 15200, avgOrderValue: 360 },
-    signupsByDay: days.map((date, i) => ({ date, count: i + 1 })),
-    revenueByDay: days.map((date, i) => ({ date, amount: 1000 + i * 100 })),
-    topProducts: [],
-    cartAbandonment: { rate: 0.2, abandoned: 10, recovered: 2 },
-    productViews: []
-  })
+// Admin: Analytics
+app.get('/admin/analytics', async (c) => {
+  try {
+    // 1. Totals
+    const { total_users } = await c.env.DB.prepare('SELECT COUNT(*) as total_users FROM users').first() as any
+    const { total_orders, total_revenue } = await c.env.DB.prepare('SELECT COUNT(*) as total_orders, SUM(total_amount) as total_revenue FROM orders').first() as any
+    const avgOrderValue = total_orders > 0 ? total_revenue / total_orders : 0
+
+    // 2. signupsByDay (last 14 days)
+    const { results: signupsByDay } = await c.env.DB.prepare(`
+      SELECT date(created_at) as date, COUNT(*) as count 
+      FROM users 
+      WHERE created_at >= date('now', '-14 days') 
+      GROUP BY date(created_at)
+    `).all()
+
+    // 3. revenueByDay (last 14 days)
+    const { results: revenueByDay } = await c.env.DB.prepare(`
+      SELECT date(created_at) as date, SUM(total_amount) as amount 
+      FROM orders 
+      WHERE created_at >= date('now', '-14 days') 
+      GROUP BY date(created_at)
+    `).all()
+
+    // 4. topProducts
+    const { results: topProducts } = await c.env.DB.prepare(`
+      SELECT p.id, p.name, SUM(oi.quantity) as units, SUM(oi.quantity * oi.price) as revenue
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      GROUP BY p.id
+      ORDER BY units DESC
+      LIMIT 5
+    `).all()
+
+    return c.json({
+      totals: { 
+        users: total_users || 0, 
+        orders: total_orders || 0, 
+        revenue: total_revenue || 0, 
+        avgOrderValue 
+      },
+      signupsByDay,
+      revenueByDay,
+      topProducts,
+      cartAbandonment: { rate: 0.2, abandoned: 10, recovered: 2 }, // Still mock for now
+      productViews: [] // Still mock for now
+    })
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500)
+  }
 })
 
-// Admin: Activity Mock
-app.get('/admin/activity', (c) => {
-  return c.json([
-    { id: "1", at: new Date().toISOString(), type: "order", message: "New order placed" }
-  ])
+// Admin: Recent Activity
+app.get('/admin/activity', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT 'order' as type, created_at as at, 'New order placed: ' || id as message 
+      FROM orders 
+      UNION ALL
+      SELECT 'status' as type, created_at as at, 'Order ' || order_id || ' updated to ' || status as message 
+      FROM order_tracking 
+      ORDER BY at DESC 
+      LIMIT 10
+    `).all()
+    
+    return c.json(results.map((r, i) => ({ ...r, id: i.toString() })))
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+// --- Admin Orders API ---
+
+// Admin: Get all orders
+app.get('/admin/orders', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT o.*, u.email as user_email 
+      FROM orders o 
+      LEFT JOIN users u ON o.user_id = u.id 
+      ORDER BY o.created_at DESC
+    `).all()
+    return c.json(results)
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+// Admin: Update order status
+app.post('/api/admin/orders/:orderId/status', async (c) => {
+  try {
+    const orderId = c.req.param('orderId')
+    const { status, description, location } = await c.req.json()
+    
+    const validStatuses = ['Placed', 'Confirmed', 'Packed', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled']
+    if (!validStatuses.includes(status)) {
+      return c.json({ error: 'Invalid status' }, 400)
+    }
+
+    const statements = []
+    
+    // Update order status and updated_at
+    statements.push(
+      c.env.DB.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .bind(status, orderId)
+    )
+    
+    // Insert new tracking record
+    statements.push(
+      c.env.DB.prepare('INSERT INTO order_tracking (order_id, status, description, location) VALUES (?, ?, ?, ?)')
+        .bind(orderId, status, description || '', location || '')
+    )
+    
+    await c.env.DB.batch(statements)
+    
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+// --- Customer Order Tracking API ---
+
+app.get('/api/orders/:orderId/tracking', async (c) => {
+  try {
+    const orderId = c.req.param('orderId')
+    
+    // Get current order status
+    const order = await c.env.DB.prepare('SELECT status FROM orders WHERE id = ?').bind(orderId).first()
+    if (!order) return c.json({ error: 'Order not found' }, 404)
+    
+    // Get tracking timeline
+    const { results: timeline } = await c.env.DB.prepare('SELECT status, description, location, created_at as time FROM order_tracking WHERE order_id = ? ORDER BY created_at DESC').bind(orderId).all()
+    
+    return c.json({
+      orderId,
+      currentStatus: order.status,
+      timeline
+    })
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+// Get orders by user email
+app.get('/api/orders/user/:email', async (c) => {
+  try {
+    const email = c.req.param('email')
+    const { results } = await c.env.DB.prepare(`
+      SELECT o.* 
+      FROM orders o 
+      JOIN users u ON o.user_id = u.id 
+      WHERE u.email = ? 
+      ORDER BY o.created_at DESC
+    `).bind(email).all()
+    return c.json(results)
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500)
+  }
 })
 
 export default app

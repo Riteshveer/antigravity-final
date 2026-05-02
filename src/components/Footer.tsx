@@ -1,9 +1,33 @@
+import { Link } from "react-router-dom";
 import { Instagram, Twitter, Youtube } from "lucide-react";
+
+const FOOTER_LINKS = {
+  Shop: [
+    { label: "3D Figures", to: "/shop/3d-figures" },
+    { label: "Anime", to: "/shop/anime" },
+    { label: "Lamps", to: "/shop/lamps" },
+    { label: "Posters", to: "/shop/posters" },
+    { label: "New Arrivals", to: "/shop/new-arrivals" },
+  ],
+  Help: [
+    { label: "Track Order", to: "/track-order" },
+    { label: "Shipping", to: "/shipping-policy" },
+    { label: "Returns", to: "/returns-policy" },
+    { label: "FAQ", to: "/faq" },
+    { label: "Contact", to: "/contact" },
+  ],
+  Company: [
+    { label: "About", to: "/about" },
+    { label: "Reviews", to: "/reviews" },
+    { label: "Careers", to: "/careers" },
+  ],
+};
 
 export const Footer = () => (
   <footer className="border-t border-border/50 mt-10">
     <div className="container mx-auto px-4 py-14">
       <div className="grid md:grid-cols-4 gap-10 mb-12">
+        {/* Brand */}
         <div>
           <div className="flex items-center gap-2 mb-4">
             <div className="w-9 h-9 rounded-xl bg-gradient-neon grid place-items-center font-display font-bold text-primary-foreground">S</div>
@@ -19,15 +43,18 @@ export const Footer = () => (
           </div>
         </div>
 
-        {[
-          { title: "Shop", links: ["3D Figures", "Anime", "Lamps", "Posters", "New Arrivals"] },
-          { title: "Help", links: ["Track Order", "Shipping", "Returns", "FAQ", "Contact"] },
-          { title: "Company", links: ["About", "Reviews", "Blog", "Request a Model", "Careers"] },
-        ].map((col) => (
-          <div key={col.title}>
-            <div className="font-display font-semibold mb-4">{col.title}</div>
+        {/* Nav columns */}
+        {Object.entries(FOOTER_LINKS).map(([title, links]) => (
+          <div key={title}>
+            <div className="font-display font-semibold mb-4">{title}</div>
             <ul className="space-y-2.5 text-sm text-muted-foreground">
-              {col.links.map((l) => <li key={l}><a href="#" className="hover:text-foreground transition">{l}</a></li>)}
+              {links.map((l) => (
+                <li key={l.to}>
+                  <Link to={l.to} className="hover:text-foreground transition">
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         ))}
@@ -36,9 +63,9 @@ export const Footer = () => (
       <div className="pt-6 border-t border-border flex flex-wrap justify-between gap-3 text-xs text-muted-foreground">
         <div>© {new Date().getFullYear()} SwapnaAakar. Made with ✦ in India.</div>
         <div className="flex gap-5">
-          <a href="#" className="hover:text-foreground">Privacy</a>
-          <a href="#" className="hover:text-foreground">Terms</a>
-          <a href="#" className="hover:text-foreground">Refunds</a>
+          <Link to="/shipping-policy" className="hover:text-foreground">Privacy</Link>
+          <Link to="/shipping-policy" className="hover:text-foreground">Terms</Link>
+          <Link to="/returns-policy" className="hover:text-foreground">Refunds</Link>
         </div>
       </div>
     </div>

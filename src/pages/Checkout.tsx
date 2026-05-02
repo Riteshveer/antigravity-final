@@ -64,6 +64,7 @@ export default function Checkout() {
         phone: addressForm.phone,
         address: `${addressForm.address}, ${addressForm.city}, ${addressForm.state} - ${addressForm.pincode}`,
         items: items.map(item => ({
+          product_id: item.id,
           name: item.name,
           quantity: item.qty,
           price: item.price,
